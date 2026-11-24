@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LoopCloser</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+
+<!-- ── Top Header ──────────────────────────────────────────────────────── -->
+<header class="app-header">
+  <div class="app-header__title">
+    LoopCloser
+    <span>deep-work dashboard</span>
+  </div>
+
+  <div class="header-stats">
+    <div class="header-stat">
+      <span class="header-stat__value" id="hdr-minutes">0m</span>
+      <span class="header-stat__label">Today</span>
+    </div>
+    <div class="header-stat">
+      <span class="header-stat__value" id="hdr-score">—</span>
+      <span class="header-stat__label">Focus Score</span>
+    </div>
+    <div class="header-stat">
+      <span class="header-stat__value" id="hdr-wip">0 / 3</span>
+      <span class="header-stat__label">Active Projects</span>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px">
+    <button class="btn-notif" id="btn-notif" title="Enable browser notifications">🔔 Notify</button>
+    <button class="btn-export" id="btn-export">↓ Export CSV</button>
+  </div>
+</header>
+
+<!-- ── Main Grid ───────────────────────────────────────────────────────── -->
+<main class="main-grid">
+
+  <!-- ── 1. Focus Timer Panel ──────────────────────────────────────────── -->
+  <section class="panel" id="focus-panel">
+    <div class="panel__header">
+      <span class="panel__title">Focus Timer</span>
+      <span class="panel__badge panel__badge--gold" id="timer-status-badge">IDLE</span>
+    </div>
+
+    <!-- IDLE view -->
+    <div id="idle-view">
+      <div class="form-group">
+        <label class="form-label" for="inp-project-session">Project</label>
+        <div class="project-input-wrap">
+          <input
+            id="inp-project-session"
+            type="text"
+            list="project-suggestions"
+            placeholder="Type or pick a project name…"
+            autocomplete="off"
+          />
+          <datalist id="project-suggestions"></datalist>
+          <span class="project-input-hint" id="project-input-hint"></span>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label" for="inp-task">Task Title</label>
+        <input id="inp-task" type="text" placeholder="What exactly are you working on?" />
+      </div>
+
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Duration</label>
+        <div class="duration-presets" id="duration-presets">
+          <button class="btn-preset" data-min="25">25m</button>
+          <button class="btn-preset" data-min="50">50m</button>
+          <button class="btn-preset" data-min="90">90m</button>
+          <button class="btn-preset" data-min="0">Custom</button>
+        </div>
+        <input id="inp-duration" type="number" min="1" max="480" placeholder="Minutes"
+               style="margin-top:8px;" value="25" />
+      </div>
+
+      <button class="btn btn-primary btn--full" id="btn-start" style="margin-top:16px">
+        ▶ Start Focus Block
+      </button>
+    </div>
+
+    <!-- RUNNING view -->
+    <div id="running-view" class="hidden">
+      <div class="timer-display">
+        <div class="timer-clock" id="timer-clock">00:00</div>
+        <div class="timer-label" id="timer-mode-label">elapsed</div>
+        <div class="timer-task-title" id="running-task-title"></div>
+        <div class="timer-project-name" id="running-project-name"></div>
+      </div>
+
+      <div class="progress-bar" style="margin-top:4px">
+        <div class="progress-bar__fill" id="progress-fill" style="width:0%"></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="form-group">
+        <label class="form-label" for="inp-outcome">Outcome <span class="text-danger">*</span></label>
+        <textarea id="inp-outcome"
+                  placeholder="What did you actually ship, resolve, or move forward? (min 5 chars)"></textarea>
+      </div>
+
+      <div class="btn-row" style="margin-top:4px">
+        <button class="btn btn-success" id="btn-complete">✓ Complete</button>
+        <button class="btn btn-danger"  id="btn-abandon">✕ Abandon</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 2. Active Projects Board ──────────────────────────────────────── -->
+  <section class="panel" id="projects-panel">
+    <div class="panel__header">
+      <span class="panel__title">Active Projects</span>
+      <span class="panel__badge panel__badge--gold" id="wip-badge">0 / 3</span>
+    </div>
+
+    <div id="wip-banner" class="wip-banner hidden">
+      WIP limit reached (3/3). Complete or archive a project to add another.
+    </div>
+
+    <div class="project-list" id="project-list">
+      <div class="empty-state">No active projects yet.</div>
+    </div>
+
+    <!-- Add project form -->
+    <div id="add-project-form">
+      <div class="form-group">
+        <label class="form-label" for="inp-project-name">New Project</label>
+        <input id="inp-project-name" type="text" placeholder="Project name" />
+      </div>
+      <button class="btn btn-ghost btn--full" id="btn-add-project" style="margin-top:8px">
+        + Add Project
+      </button>
+    </div>
+  </section>
+
+  <!-- ── 3. Daily Review Panel ─────────────────────────────────────────── -->
+  <section class="panel panel--wide" id="review-panel">
+    <div class="panel__header">
+      <span class="panel__title">Daily Execution Review</span>
+      <button class="btn btn-ghost" id="btn-refresh-review" style="font-size:11px;padding:5px 10px">↻ Refresh</button>
+    </div>
+
+    <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap">
+
+      <!-- Score ring -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+        <div class="score-ring">
+          <svg viewBox="0 0 90 90" width="90" height="90">
+            <circle class="score-ring__track" cx="45" cy="45" r="38"/>
+            <circle class="score-ring__fill" id="score-ring-fill"
+                    cx="45" cy="45" r="38"
+                    stroke-dasharray="238.76"
+                    stroke-dashoffset="238.76"/>
+          </svg>
+          <div class="score-ring__label">
+            <span class="score-ring__number" id="score-number">—</span>
+            <span class="score-ring__sub">score</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="review-grid" style="flex:1;min-width:260px">
+        <div class="stat-card">
+          <div class="stat-card__value" id="stat-total-min">0</div>
+          <div class="stat-card__label">Deep-Work Min</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__value" id="stat-completed">0</div>
+          <div class="stat-card__label">Completed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__value" id="stat-abandoned">0</div>
+          <div class="stat-card__label">Abandoned</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__value" id="stat-stale">0</div>
+          <div class="stat-card__label">Stale Projects</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Stale alert -->
+    <div id="stale-alert" class="hidden" style="
+      background:rgba(239,68,68,.07);
+      border:1px solid rgba(239,68,68,.3);
+      border-radius:var(--radius);
+      padding:10px 14px;
+      font-size:12px;
+      color:var(--danger)">
+      <strong>Stale projects (&gt;48 h inactive):</strong>
+      <span id="stale-names"></span>
+    </div>
+
+    <!-- Outcome log -->
+    <div class="form-label" style="margin-top:4px">Today's Sessions</div>
+    <div class="outcome-log" id="outcome-log">
+      <div class="empty-state">No sessions logged today.</div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Toast container ─────────────────────────────────────────────────── -->
+<div id="toast-container"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
